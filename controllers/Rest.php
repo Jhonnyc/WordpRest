@@ -5,6 +5,10 @@
  * Date: 20/08/2017
  * Time: 22:19
  */
+define('KB', 1024);
+define('MB', 1048576);
+define('GB', 1073741824);
+define('TB', 1099511627776);
 class JSON_API_Rest_Controller {
 
     var $SECURE = FALSE;
@@ -110,6 +114,244 @@ class JSON_API_Rest_Controller {
             "msg" => $msg,
             "user_id" => $user_id
         );
+    }
+
+    /**
+     * Returns a session for active user
+     * @param String nonce : A unique identifier for the user per this method
+     * @param String email: The user email
+     * @param String password: The user password
+     */
+    public function login() {
+        // Method variables
+        global $json_api;
+        $msg = "error";
+        $status = -1;
+        $cookie = -1;
+        $user_id = -1;
+        $expiration = -1;
+        $avatar = -1;
+
+        // Get the nonce
+        $nonce = $this->getSafeText($_REQUEST['nonce']);//trim(sanitize_text_field($_REQUEST['nonce']));
+        $nonce_id = $json_api->get_nonce_id('user', 'login');
+
+        // Get the user parameters that is required by wordpress
+        $email = $this->getSafeText($_REQUEST['email']);//trim(sanitize_email($_REQUEST['email']));
+        $password = $this->getSafeText($_REQUEST['password']);//trim(sanitize_text_field($_REQUEST['password']));
+
+        if (!$nonce) {
+            $msg = "You must include 'nonce' var in your request. Use the 'get_nonce' Core API method.";
+        } elseif (!$email) {
+            $msg = "You must include 'email' var in your request.";
+        } elseif (!is_email($email)) {
+            $msg = "E-mail address is invalid.";
+        } elseif (!email_exists($email)) {
+            $msg = "E-mail address doesn't exist.";
+        } elseif (!$password) {
+            $msg = "You must include 'password' var in your request.";
+        } elseif (!wp_verify_nonce($nonce, $nonce_id)) {
+            $msg = "Your 'nonce' value was incorrect. Use the 'get_nonce' API method.";
+        } else {
+
+            // Get the user from the email
+            $user = get_user_by('email', $email);
+            $username = $user->user_login;
+
+            // All the parameters are ok try and authenticate the user
+            $user = wp_authenticate($username, $password);
+            if (is_wp_error($user)) {
+                $msg = "Invalid username and/or password.";
+                remove_action('wp_login_failed', $username);
+            } else {
+
+                // Generate a cookie for two weeks
+                $status = 1;
+                $msg = "ok";
+                $expiration = time() + apply_filters('auth_cookie_expiration', 60 * 60 * 24 * 14, $user->ID, true);
+                $cookie = wp_generate_auth_cookie($user->ID, $expiration, 'logged_in');
+                $user_id = $user->ID;
+                //preg_match('|src="(.+?)"|', get_avatar($user->ID, 32), $avatar);
+
+                // Get the user profile pic
+                $target_file = "/var/www/pics/" . $user->ID . "/" . $user->ID . ".jpg";
+                if (file_exists($target_file)) {
+                    //$avatar = $target_file;
+                    $path = "http://" . SERVER_URL . "/pics/" . $user->ID . "/" . $user->ID . ".jpg";
+                    $avatar = strtr($path, array('\\' => '/'));//str_replace("\\","/",$path);
+                }
+            }
+        }
+
+        return json_encode(array(
+            "status" => $status,
+            "msg" => $msg,
+            "expiration" => $expiration,
+            "cookie" => $cookie,
+            "user_id" => $user_id,
+            "avatar" => $avatar
+        ), JSON_UNESCAPED_SLASHES);
+    }
+
+    public function upload() {
+        // Method variables
+        global $json_api;
+        $msg = "error";
+        $status = -1;
+        $cookie = -1;
+        $uploadOk = 1;
+
+        // Get the data
+        $cookie = trim(sanitize_text_field($_REQUEST['cookie']));//$this->getSafeText($_REQUEST['cookie']);//
+
+        if (!$cookie) {
+            $msg = "You must include a 'cookie' var in your request.";
+        } else {
+            $user_id = wp_validate_auth_cookie($cookie, 'logged_in');
+            if (!$user_id) {
+                $msg = "Invalid authentication cookie.";
+            } else {
+                // Get the relevant data for the user
+                // And create the directory for him
+                $user = get_userdata($user_id);
+                $target_dir = "/var/www/pics/" . $user->ID;
+                if (!file_exists($target_dir)) {
+                    mkdir($target_dir, 0777, true);
+                }
+
+                // Check if image file is a actual image or fake image
+                if (isset($_POST["submit"])) {
+                    $check = getimagesize($_FILES["file"]["tmp_name"]);
+                    if ($check !== false) {
+                        $msg = "File is an image.";
+                        $uploadOk = 1;
+                    } else {
+                        $msg = "File is not an image.";
+                        $uploadOk = 0;
+                    }
+                }
+
+                // Check file size
+                if ($_FILES["file"]["size"] > 100 * KB) {
+                    $msg = "Sorry, your file is too large.";
+                    $uploadOk = 0;
+                }
+
+                // Create the file for upload
+                $imageFileType = pathinfo($_FILES["file"]["name"], PATHINFO_EXTENSION);
+
+                // Allow certain file formats
+                if ($imageFileType != "jpg" && $imageFileType != "jpeg") {//&& $imageFileType != "png"
+                    // && $imageFileType != "gif" ) {
+                    $msg = "Sorry, only JPG & JPEG files are allowed.";
+                    $uploadOk = 0;
+                }
+
+                $target_file = $target_dir . "/" . $user->ID . "." . $imageFileType;//basename($_FILES["file"]["name"]);
+                // Check if $uploadOk is set to 0 by an error
+                // if everything is ok, try to upload file
+                if ($uploadOk == 0) {
+                    //$msg = "Sorry, your file was not uploaded.";
+                } else {
+                    if (move_uploaded_file($_FILES["file"]["tmp_name"], $target_file)) {
+                        $status = 1;
+                        $msg = "The file has been uploaded.";
+                    } else {
+                        $msg = "Sorry, there was an error uploading your file.";
+                    }
+                }
+            }
+        }
+
+        return json_encode(array(
+            "status" => $status,
+            "msg" => $msg
+        ));
+    }
+
+    public function report_online()
+    {
+
+        // Methos variables
+        global $wpdb;
+        global $json_api;
+        $status = -1;
+        $msg = "error";
+        $cookie = trim(sanitize_text_field($_REQUEST['cookie']));//$this->getSafeText($_REQUEST['cookie']);
+        $lat = $this->getSafeText($_REQUEST['lat']);//trim(sanitize_text_field( $_REQUEST['lat'] ));
+        $lng = $this->getSafeText($_REQUEST['lng']);//trim(sanitize_text_field( $_REQUEST['lng'] ));
+        $city = $this->getSafeText($_REQUEST['city']);//trim(sanitize_text_field( $_REQUEST['city'] ));
+        $table_location = $wpdb->prefix . "location";
+
+
+        // Check all of the parameters
+        if (!$cookie) {
+            $msg = "You must include 'cookie' var in your request.";
+        } elseif (!$lat) {
+            $msg = "You must include 'lat' var in your request.";
+        } elseif (!is_numeric($lat)) {
+            $msg = "Latitude can only be a number.";
+        } elseif (!$lng) {
+            $msg = "You must include 'lng' var in your request.";
+        } elseif (!is_numeric($lng)) {
+            $msg = "Longitude can only be a number.";
+        } elseif (!$city) {
+            $msg = "You must include 'city' var in your request.";
+        } else {
+
+            $user_id = wp_validate_auth_cookie($cookie, 'logged_in');
+            if (!$user_id) {
+                $msg = "Invalid authentication cookie.";
+            } else {
+                $status = 1;
+                $msg = "ok";
+                $data = array("id" => $user_id,
+                    "latitude" => $lat,
+                    "longitude" => $lng,
+                    "city" => $city,
+                    "online" => "1");
+                $wpdb->replace($table_location, $data);
+            }
+        }
+
+        return json_encode(array(
+            "status" => $status,
+            "msg" => $msg,
+        ));
+    }
+
+    public function report_offline()
+    {
+
+        // Methos variables
+        global $wpdb;
+        global $json_api;
+        $status = -1;
+        $msg = "error";
+        $cookie = trim(sanitize_text_field($_REQUEST['cookie']));//$this->getSafeText($_REQUEST['cookie']);//
+        $table_location = $wpdb->prefix . "location";
+
+
+        // Check all of the parameters
+        if (!$cookie) {
+            $msg = "You must include 'cookie' var in your request.";
+        } else {
+
+            $user_id = wp_validate_auth_cookie($cookie, 'logged_in');
+            if (!$user_id) {
+                $msg = "Invalid authentication cookie.";
+            } else {
+                $status = 1;
+                $msg = "ok";
+                $data = array("id" => $user_id);
+                $wpdb->delete($table_location, $data);
+            }
+        }
+
+        return json_encode(array(
+            "status" => $status,
+            "msg" => $msg,
+        ));
     }
 
     /**
