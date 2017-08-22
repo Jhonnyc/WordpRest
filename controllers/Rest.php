@@ -19,8 +19,7 @@ class JSON_API_Rest_Controller {
         // turn this sanity-check off if you feel safe inside your localhost or intranet.
         if($this->SECURE) {
             if (empty($_SERVER['HTTPS']) ||
-                (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'off')
-            ) {
+                (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'off')) {
                 if (empty($_REQUEST['insecure']) || $_REQUEST['insecure'] != 'cool') {
                     $json_api->error("SSL is not enabled. Either use _https_ or provide 'insecure' var as insecure=cool to confirm you want to use http protocol.");
                 }
@@ -38,13 +37,13 @@ class JSON_API_Rest_Controller {
     public function register(){
         global $json_api;
 
-        $username = sanitize_user( $_REQUEST['username'] );
-        $email = sanitize_email( $_REQUEST['email'] );
-        $password = sanitize_text_field( $_REQUEST['password'] );
-        $displayname = sanitize_text_field( $_REQUEST['display_name'] );
-        $user_first_name =  sanitize_text_field( $_REQUEST['user_first_name'] );
-        $user_last_name = sanitize_text_field( $_REQUEST['user_last_name'] );
-        $user_facebook_id = sanitize_text_field( $_REQUEST['user_last_name'] );
+        $username = sanitize_user( $_POST['username'] );
+        $email = sanitize_email( $_POST['email'] );
+        $password = sanitize_text_field( $_POST['password'] );
+        $displayname = sanitize_text_field( $_POST['display_name'] );
+        $user_first_name =  sanitize_text_field( $_POST['user_first_name'] );
+        $user_last_name = sanitize_text_field( $_POST['user_last_name'] );
+        $user_facebook_id = sanitize_text_field( $_POST['user_last_name'] );
 
         //Add usernames we don't want used
         $invalid_usernames = array( 'admin' );
@@ -269,8 +268,7 @@ class JSON_API_Rest_Controller {
         ));
     }
 
-    public function report_online()
-    {
+    public function report_online() {
 
         // Methos variables
         global $wpdb;
