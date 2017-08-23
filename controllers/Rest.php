@@ -5,10 +5,10 @@
  * Date: 20/08/2017
  * Time: 22:19
  */
-define('KB', 1024);
+/*define('KB', 1024);
 define('MB', 1048576);
 define('GB', 1073741824);
-define('TB', 1099511627776);
+define('TB', 1099511627776);*/
 class JSON_API_Rest_Controller {
 
     var $SECURE = FALSE;
@@ -37,18 +37,18 @@ class JSON_API_Rest_Controller {
     public function register(){
         global $json_api;
 
-        $username = sanitize_user( $_POST['username'] );
-        $email = sanitize_email( $_POST['email'] );
-        $password = sanitize_text_field( $_POST['password'] );
-        $displayname = sanitize_text_field( $_POST['display_name'] );
-        $user_first_name =  sanitize_text_field( $_POST['user_first_name'] );
-        $user_last_name = sanitize_text_field( $_POST['user_last_name'] );
-        $user_facebook_id = sanitize_text_field( $_POST['user_last_name'] );
+        $username = sanitize_user( $_REQUEST['username'] );
+        $email = sanitize_email( $_REQUEST['email'] );
+        $password = sanitize_text_field( $_REQUEST['password'] );
+        $displayname = sanitize_text_field( $_REQUEST['display_name'] );
+        $user_first_name =  sanitize_text_field( $_REQUEST['user_first_name'] );
+        $user_last_name = sanitize_text_field( $_REQUEST['user_last_name'] );
+        $user_facebook_id = sanitize_text_field( $_REQUEST['user_last_name'] );
 
         //Add usernames we don't want used
         $invalid_usernames = array( 'admin' );
         //Do username validation
-        $nonce_id = $json_api->get_nonce_id('user', 'register');
+        $nonce_id = $json_api->get_nonce_id('rest', 'register');
 
         if (!$username) {
             $msg = "You must include a 'username' var in your request.";
@@ -111,6 +111,7 @@ class JSON_API_Rest_Controller {
 
         return array(
             "msg" => $msg,
+            "nonceId" => $nonce_id,
             "user_id" => $user_id
         );
     }
@@ -133,7 +134,7 @@ class JSON_API_Rest_Controller {
 
         // Get the nonce
         $nonce = $this->getSafeText($_REQUEST['nonce']);//trim(sanitize_text_field($_REQUEST['nonce']));
-        $nonce_id = $json_api->get_nonce_id('user', 'login');
+        $nonce_id = $json_api->get_nonce_id('rest', 'login');
 
         // Get the user parameters that is required by wordpress
         $email = $this->getSafeText($_REQUEST['email']);//trim(sanitize_email($_REQUEST['email']));
@@ -378,7 +379,7 @@ class JSON_API_Rest_Controller {
         $problem_inserting_new_data = "An error has occured while trying to insert new data.";
 
         // Check for a valid nonce value
-        $nonce_id = $json_api->get_nonce_id('user', 'remove_account');
+        $nonce_id = $json_api->get_nonce_id('rest', 'remove_account');
         $user = wp_authenticate_using_email($user_email, $password);
 
         // In case the password and email are ok get the user id from the $user object
@@ -448,7 +449,7 @@ class JSON_API_Rest_Controller {
         $problem_inserting_new_data = "An error has occured while trying to insert new data.";
 
         // Check for a valid nonce value
-        $nonce_id = $json_api->get_nonce_id('user', 'order_cigarette_flavor');
+        $nonce_id = $json_api->get_nonce_id('rest', 'order_cigarette_flavor');
 
 
         // Check all of the parameters
@@ -516,7 +517,7 @@ class JSON_API_Rest_Controller {
     public function generate_auth_cookie() {
         global $json_api;
 
-        $nonce_id = $json_api->get_nonce_id('user', 'generate_auth_cookie');
+        $nonce_id = $json_api->get_nonce_id('rest', 'generate_auth_cookie');
         if (!wp_verify_nonce($json_api->query->nonce, $nonce_id)) {
             $json_api->error("Your 'nonce' value was incorrect. Use the 'get_nonce' API method.");
         }
@@ -569,7 +570,7 @@ class JSON_API_Rest_Controller {
         global $json_api;
         global $wpdb;
 
-        $nonce_id = $json_api->get_nonce_id('user', 'generate_auth_cookie_by_email');
+        $nonce_id = $json_api->get_nonce_id('rest', 'generate_auth_cookie_by_email');
         if (!wp_verify_nonce($json_api->query->nonce, $nonce_id)) {
             $json_api->error("Your 'nonce' value was incorrect. Use the 'get_nonce' API method.");
         }
